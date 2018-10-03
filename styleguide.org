@@ -1,0 +1,58 @@
+* Disclaimer
+I'm making this up as a go, and I don't know what I'm doing.
+
+This is inspired (very very very loosely) by Unreal Engine's [[https://docs.unrealengine.com/en-us/Programming/Development/CodingStandard][Coding
+Standard]] document, because that is what happens to currently look
+good, neutral, and clean to me at the moment.
+
+So, the very general guidelines are:
+
+ - Indent with tabs, not spaces.
+
+ - Braces or equivalent on own line is good, actually (but only when
+   it makes sense).
+
+ - When in doubt TitleCase is a reasonable default for naming things,
+   but also be consistent with what you are modifying or working with.
+
+* Naming Things
+** keywords
+Use lowercase for keywords, eg ~entity~.
+
+** library names, namespaces, etc
+Use lowercase.  Eg ~use ieee.numeric_std.all;~.
+
+** user defined types
+Lowercase, use underscores as spaces to be consistent with the ieee
+type names.
+
+** entity and architecture names
+Lowercase with underscores.
+
+** labels
+Lowercase.  Underscores.
+
+** constants
+SCREAM_THE_UNYIELDING_TRUTHS_MIGHTILY
+
+** signals
+Use title case.  Eg ~signal MyGloriousSignal~.
+
+** ports and generics
+Use title case, but also prefix with an "i" an "o", or a "g"
+accordingly.  Eg:
+
+#+BEGIN_SRC vhdl
+entity hail_eris is
+	generic (
+		gFnord : integer := 10
+	);
+	port (
+		iFhqwhgads : in std_logic;
+		oXyzzy : out std_logic
+	);
+end hail_eris;
+#+END_SRC
+
+** indentation
+Use tabs instead of spaces.  "4" is a good tab width.
