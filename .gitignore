@@ -1,1 +1,4 @@
 uart-for-fpga/
+*.o
+*.cf
+byte_classifier_tests
