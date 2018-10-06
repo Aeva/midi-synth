@@ -4,13 +4,7 @@ package midi is
 
 	type frame_type is
 	(
-		FRAME_REALTIME,
-		FRAME_STATUS,
-		FRAME_DATA
-	);
-	
-	type status_message is 
-	(
+		DATA_FRAME,
 		STATUS_NOTE_ON,
 		STATUS_NOTE_OFF,
 		STATUS_POLYPHONIC_PRESSURE,
@@ -18,11 +12,7 @@ package midi is
 		STATUS_PROGRAM_CHANGE,
 		STATUS_CHANNEL_PRESSURE,
 		STATUS_PITCH_BLEND,
-		STATUS_SYSTEM
-	);
-
-	type realtime_message is
-	(
+		STATUS_SYSTEM,
 		REALTIME_TIMING_CLOCK,
 		REALTIME_UNDEFINED1,
 		REALTIME_START,
@@ -31,6 +21,9 @@ package midi is
 		REALTIME_UNDEFINED2,
 		REALTIME_ACTIVE_SENSE,
 		REALTIME_SYSTEM_RESET
-	);	
+	);
+
+	constant STATUS_OFFSET : integer := frame_type'POS(STATUS_NOTE_ON);
+	constant REALTIME_OFFSET : integer := frame_type'POS(REALTIME_TIMING_CLOCK);
 	
 end midi;
