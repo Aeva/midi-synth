@@ -3,6 +3,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.midi.all;
+use work.midi_test_helper.all;
 
 entity event_builder_tests is
 end event_builder_tests;
@@ -13,14 +14,14 @@ architecture tests of event_builder_tests is
 	signal MidiReady : std_logic := '0';
 	signal Clock : std_logic := '0';
 
-	signal StatusReady : std_logic;
+	signal StatusReady : std_logic := '0';
 	signal StatusMessage : frame_type;
 	signal StatusChannel : unsigned(3 downto 0);
 	signal StatusParam1 : unsigned(6 downto 0);
 	signal StatusParam2 : unsigned(6 downto 0);
 
 	signal IgnoredByte : std_logic_vector(7 downto 0);
-	signal IgnoredReady : std_logic;
+	signal IgnoredReady : std_logic := '0';
 
 	constant NoteOn : std_logic_vector(7 downto 0) := "10000000";
 	constant NoteOff : std_logic_vector(7 downto 0) := "10010000";
@@ -32,10 +33,19 @@ architecture tests of event_builder_tests is
 	constant LowishVelocity : std_logic_vector(7 downto 0) := "00001101";
 	constant HighishVelocity : std_logic_vector(7 downto 0) := "01100110";
 
-	constant ProgramChange : std_logic_vector(7 downto 0) := "11000000";
-	constant ProgramOne : std_logic_vector(7 downto 0) := "00000001";
-	constant ProgramTwo : std_logic_vector(7 downto 0) := "00000000";
+	-- I currently have no intention to implement system common
+	-- messages, so receiving one should put the builder into an
+	-- ignore state.  "Song Position" should receive two data bytes.  The ones
+	-- given below are contrived.
+	constant SongPosition : std_logic_vector(7 downto 0) := "11110010";
+	constant SongPositionData1 : std_logic_vector(7 downto 0) := "00001010";
+	constant SongPositionData2 : std_logic_vector(7 downto 0) := "00100110";
 
+	-- System realtime messages would be processed or ignored by
+	-- another mechanism, probably, so if one is received between two
+	-- data bytes, it shouldn't mess anything up.
+	constant ActiveSense : std_logic_vector(7 downto 0) := "11111110";
+	
 begin
 
 	event_builder: entity work.event_builder
@@ -58,75 +68,92 @@ begin
 	process
 	begin
 
-		-- idle
-		Clock <= '1';
-		wait for 10 ns;
-		Clock <= '0';
-		wait for 10 ns;
+		--
+		-- no new data
+		--
+		Tick(Clock);
+		Tock(Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
 
-		assert StatusReady = '0'
-			report "should not start with status ready on" severity failure;
-		assert StatusReady = '0'
-			report "should not start with ignore ready on" severity failure;
-		
-		MidiByte <= NoteOn;
-		wait for 1 ns; -- presumably this is set some clock ticks
-					   -- before MidiReady would be
-		MidiReady <= '1';
-		Clock <= '1';
-		wait for 10 ns;
+		--
+		-- play a note
+		--
+		NewFrame(NoteOn, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
+		-- data byte 1
+		NewFrame(MiddleC, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
+		-- data byte 2
+		NewFrame(LowishVelocity, MidiByte, MidiReady, Clock);
+		AssertHigh(StatusReady);
+		AssertLow(IgnoredReady);
+		-- new status event!
+		AssertStatus(StatusMessage, STATUS_NOTE_ON,
+					 StatusChannel, 0,
+					 StatusParam1, MiddleC,
+					 StatusParam2, LowishVelocity);
 
-		assert StatusReady = '0'
-			report "no status change should have occured" severity failure;
-		assert IgnoredReady = '0'
-			report "no ignore change should have occured" severity failure;
+		--
+		-- running status for a second note
+		--
+		-- data byte 1
+		NewFrame(AnotherNote, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
+		-- data byte 2
+		NewFrame(HighishVelocity, MidiByte, MidiReady, Clock);
+		AssertHigh(StatusReady);
+		AssertLow(IgnoredReady);
+		-- new status event!
+		AssertStatus(StatusMessage, STATUS_NOTE_ON,
+					 StatusChannel, 0,
+					 StatusParam1, AnotherNote,
+					 StatusParam2, HighishVelocity);
 
-		-- idle
-		MidiReady <= '0';
-		Clock <= '0';
-		wait for 10 ns;
-		Clock <= '1';
-		wait for 10 ns;
+		--
+		-- unhandled system common message data should be ignored
+		--
+		NewFrame(SongPosition, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertHigh(IgnoredReady);
+		NewFrame(SongPositionData1, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertHigh(IgnoredReady);
+		NewFrame(SongPositionData2, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertHigh(IgnoredReady);
 
-		assert StatusReady = '0'
-			report "no status change should have occured" severity failure;
-		assert IgnoredReady = '0'
-			report "no ignore change should have occured" severity failure;
-
-		MidiByte <= MiddleC;
-		Clock <= '0';
-		wait for 10 ns;
-		MidiReady <= '1';
-		Clock <= '1';
-		wait for 10 ns;
-
-		assert StatusReady = '0'
-			report "no status change should have occured" severity failure;
-		assert IgnoredReady = '0'
-			report "no ignore change should have occured" severity failure;
-
-		MidiByte <= LowishVelocity;
-		Clock <= '0';
-		wait for 10 ns;
-		MidiReady <= '1';
-		Clock <= '1';
-		wait for 10 ns;
-
-		assert StatusReady = '1'
-			report "a status change should have occured" severity failure;
-		assert IgnoredReady = '0'
-			report "no ignore change should have occured" severity failure;
-
-		assert StatusMessage = STATUS_NOTE_ON
-			report "StatusMessage should be STATUS_NOTE_ON" severity failure;
-		assert StatusChannel = 0
-			report "StatusChannel should be 0" severity failure;
-		assert StatusParam1 = unsigned(MiddleC)
-			report "StatusParam1 should be MiddleC" severity failure;
-		assert StatusParam2 = unsigned(LowishVelocity)
-			report "StatusParam2 should be LowishVelocity" severity failure;
-
-
+		--
+		-- status message interrupted by system realtime messages should still
+		-- be received correctly
+		--
+		NewFrame(NoteOff, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
+		-- system realtime message
+		NewFrame(ActiveSense, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertHigh(IgnoredReady);
+		-- data byte 1
+		NewFrame(MiddleC, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertLow(IgnoredReady);
+		-- system realtime message
+		NewFrame(ActiveSense, MidiByte, MidiReady, Clock);
+		AssertLow(StatusReady);
+		AssertHigh(IgnoredReady);
+		-- data byte 2
+		NewFrame(ZeroVelocity, MidiByte, MidiReady, Clock);
+		AssertHigh(StatusReady);
+		AssertLow(IgnoredReady);
+		-- new status event!
+		AssertStatus(StatusMessage, STATUS_NOTE_OFF,
+					 StatusChannel, 0,
+					 StatusParam1, MiddleC,
+					 StatusParam2, ZeroVelocity);
 		
 		wait;
 	end process;

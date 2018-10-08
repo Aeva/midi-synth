@@ -2,6 +2,7 @@
 
 ghdl --remove
 ghdl -a --std=08 midi/midi.vhd \
+     midi/midi_test_helper.vhd \
      midi/byte_classifier.vhd \
      midi/byte_classifier_tests.vhd \
      midi/event_builder.vhd \
