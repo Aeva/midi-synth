@@ -93,6 +93,6 @@ begin
 		assert FrameType = REALTIME_SYSTEM_RESET
 			report "wrong frame type" severity failure;
 
-		wait for 10 sec;
+		wait;
 	end process;
 end tests;

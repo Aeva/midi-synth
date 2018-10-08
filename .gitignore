@@ -2,3 +2,4 @@ uart-for-fpga/
 *.o
 *.cf
 byte_classifier_tests
+event_builder_tests
