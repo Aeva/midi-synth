@@ -12,9 +12,7 @@ architecture tests of byte_classifier_tests is
 	signal RunSim : std_logic := '1';
 
 	signal MidiFrame : std_logic_vector(7 downto 0);
-	signal FrameType : frame_type;
-	signal AsChannel : unsigned(3 downto 0);
-	signal AsData : unsigned(6 downto 0);
+	signal Decoded : decoded_byte;
 
 	constant NoteOn : std_logic_vector(7 downto 0) := "10000011";
 	constant NoteOff : std_logic_vector(7 downto 0) := "10010011";
@@ -24,74 +22,88 @@ architecture tests of byte_classifier_tests is
 	constant TimingClock : std_logic_vector(7 downto 0) := "11111000";
 	constant SystemReset : std_logic_vector(7 downto 0) := "11111111";
 	constant DataMaxValue : std_logic_vector(7 downto 0) := "01111111";
+
+	procedure ExpectData
+	(
+		constant AssertParam : in integer;
+		signal Decoded : in decoded_byte
+	) is
+	begin
+		wait for 1 ns;
+		assert Decoded.FrameType = DATA_FRAME
+			report "wrong frame type" severity failure;
+		assert to_integer(Decoded.AsParam) = AssertParam
+			report "wrong parameter value" severity failure;
+	end ExpectData;
+
+	procedure ExpectStatus
+	(
+		constant AssertType : in frame_type;
+		constant AssertChannel : in integer;
+		signal Decoded : in decoded_byte
+	) is
+	begin
+		wait for 1 ns;
+		assert Decoded.FrameType = AssertType
+			report "wrong frame type" severity failure;
+		assert to_integer(Decoded.AsChannel) = AssertChannel
+			report "wrong channel value" severity failure;
+
+	end ExpectStatus;
+
+	procedure ExpectRealtime
+	(
+		constant AssertType : in frame_type;
+		signal Decoded : in decoded_byte
+	) is
+	begin
+		wait for 1 ns;
+		assert Decoded.FrameType = AssertType
+			report "wrong frame type" severity failure;
+	end ExpectRealtime;
+
 begin
 
 	byte_classifier: entity work.byte_classifier
 	port map
 	(
 		iMidiByte => MidiFrame,
-		oFrameType => FrameType,
-		oAsChannel => AsChannel,
-		oAsData => AsData
+		oDecodedByte => Decoded
 	);
 
 	process
 	begin
 		-- note on
 		MidiFrame <= NoteOn;
-		wait for 1 ns;
-		assert FrameType = STATUS_NOTE_ON
-			report "wrong frame type" severity failure;
-		assert AsChannel = 3
-			report "wrong channel value" severity failure;
+		ExpectStatus(STATUS_NOTE_ON, 3, Decoded);
 
 		-- note off
 		MidiFrame <= NoteOff;
-		wait for 1 ns;
-		assert FrameType = STATUS_NOTE_OFF
-			report "wrong frame type" severity failure;
-		assert AsChannel = 3
-			report "wrong channel value" severity failure;
+		ExpectStatus(STATUS_NOTE_OFF, 3, Decoded);
 
 		-- timing clock
 		MidiFrame <= TimingClock;
-		wait for 1 ns;
-		assert FrameType = REALTIME_TIMING_CLOCK
-			report "wrong frame type" severity failure;
+		ExpectRealtime(REALTIME_TIMING_CLOCK, Decoded);
 
 		-- control change
 		MidiFrame <= CtrlChange;
-		wait for 1 ns;
-		assert FrameType = STATUS_CONTROL_CHANGE
-			report "wrong frame type" severity failure;
-		assert AsChannel = 14
-			report "wrong channel value" severity failure;
+		ExpectStatus(STATUS_CONTROL_CHANGE, 14, Decoded);
 
 		-- song position
 		MidiFrame <= SongPosition;
-		wait for 1 ns;
-		assert FrameType = STATUS_SYSTEM
-			report "wrong frame type" severity failure;
+		ExpectStatus(STATUS_SYSTEM, 2, Decoded);
 
 		-- eox
 		MidiFrame <= EOX;
-		wait for 1 ns;
-		assert FrameType = STATUS_SYSTEM
-			report "wrong frame type" severity failure;
+		ExpectStatus(STATUS_SYSTEM, 7, Decoded);
 
 		-- data frame
 		MidiFrame <= DataMaxValue;
-		wait for 1 ns;
-		assert FrameType = DATA_FRAME
-			report "wrong frame type" severity failure;
-		assert AsData = 127
-			report "wrong data value" severity failure;
+		ExpectData(127, Decoded);
 
 		-- data frame
 		MidiFrame <= SystemReset;
-		wait for 1 ns;
-		assert FrameType = REALTIME_SYSTEM_RESET
-			report "wrong frame type" severity failure;
+		ExpectRealtime(REALTIME_SYSTEM_RESET, Decoded);
 
 		wait;
 	end process;

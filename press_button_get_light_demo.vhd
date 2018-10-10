@@ -20,7 +20,7 @@ entity press_button_get_light is
 		iMidiRxD : in std_logic;
 
 		-- indicator light
-		oStatusLight : out std_logic
+		oStatusLights : out std_logic_vector(3 downto 0)
 	);
 end press_button_get_light;
 
@@ -47,34 +47,49 @@ architecture etc of press_button_get_light is
 
 	-- midi event signals
 	signal StatusReady : std_logic := '0';
-	signal StatusMessage : frame_type;
-	signal StatusChannel : unsigned(3 downto 0);
-	signal StatusParam1 : unsigned(6 downto 0);
-	signal StatusParam2 : unsigned(6 downto 0);
+	signal Status : status_message;
 	signal IgnoredByte : std_logic_vector(7 downto 0);
 	signal IgnoredReady : std_logic := '0';
 
-	signal NoteStatus : std_logic := '0';
+	signal NoteStatus : std_logic_vector(3 downto 0) := "0000";
 
 begin
 
 	Reset <= not iReset;
 
-	oStatusLight <= not NoteStatus; -- set to ground to turn on the light
+	oStatusLights <= not NoteStatus; -- set to ground to turn on the light
 
 	process (iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (StatusReady = '1' and StatusParam1 = 60) then
-				if (StatusMessage = STATUS_NOTE_ON and StatusParam2 > 0) then
-
-					NoteStatus <= '1';
-					
-				elsif (StatusMessage = STATUS_NOTE_OFF or (StatusMessage = STATUS_NOTE_ON and StatusParam2 = 0)) then
-
-					NoteStatus <= '0';
-					
-				end if;
+			if (StatusReady = '1') then
+				case Status.Message is
+					when STATUS_NOTE_ON =>
+						case to_integer(Status.Param1) is
+							when 60 =>
+								NoteStatus(0) <= '1';
+							when 62 =>
+								NoteStatus(1) <= '1';
+							when 64 =>
+								NoteStatus(2) <= '1';
+							when 65 =>
+								NoteStatus(3) <= '1';
+							when others =>
+						end case;
+					when STATUS_NOTE_OFF =>
+						case to_integer(Status.Param1) is
+							when 60 =>
+								NoteStatus(0) <= '0';
+							when 62 =>
+								NoteStatus(1) <= '0';
+							when 64 =>
+								NoteStatus(2) <= '0';
+							when 65 =>
+								NoteStatus(3) <= '0';
+							when others =>
+						end case;
+					when others =>
+				end case;
 			end if;
 		end if;
 	end process;
@@ -87,10 +102,7 @@ begin
 		iDataReady => MidiReady,
 		iClock => iClock,
 		oStatusReady => StatusReady,
-		oStatusMessage => StatusMessage,
-		oStatusChannel => StatusChannel,
-		oStatusParam1 => StatusParam1,
-		oStatusParam2 => StatusParam2,
+		oStatus => Status,
 		oIgnoredByte => IgnoredByte,
 		oIgnoredReady => IgnoredReady
 	);

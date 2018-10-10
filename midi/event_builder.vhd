@@ -9,15 +9,12 @@ entity event_builder is
 	port (
 		-- inputs
 		iMidiByte : in std_logic_vector(7 downto 0); -- uart frame
-		iDataReady : std_logic;
-		iClock : std_logic;
+		iDataReady : in std_logic;
+		iClock : in std_logic;
 
 		-- output events
 		oStatusReady : out std_logic;
-		oStatusMessage : out frame_type;
-		oStatusChannel : out unsigned(3 downto 0);
-		oStatusParam1 : out unsigned(6 downto 0);
-		oStatusParam2 : out unsigned(6 downto 0);
+		oStatus : out status_message;
 
 		-- for debugging
 		oIgnoredByte : out std_logic_vector(7 downto 0);
@@ -33,49 +30,61 @@ architecture etc of event_builder is
 	signal IgnoreData : std_logic := '1';
 	signal Datums : integer;
 
-	signal NewType : frame_type;
-	signal NewAsChannel : unsigned(3 downto 0);
-	signal NewAsData : unsigned(6 downto 0);
-	signal NewIsStatus : std_logic;
+	signal WorkingType : frame_type;
+	signal NewDecoded : decoded_byte;
+	
+	procedure NewStatus
+	(
+		signal iNewType : in frame_type;
+		signal iNewChannel : in midi_channel;
+		signal oWorkingType : out frame_type;
+		signal oIgnoreData : out std_logic;
+		signal oDatums : out integer;
+		signal oNewStatus : out status_message
+	) is
+	begin
+		oWorkingType <= iNewType;
+		oIgnoreData <= '0';
+		oDatums <= 0;
+		oNewStatus <= (iNewType, iNewChannel, to_midi_param(0), to_midi_param(0));
+	end NewStatus;
 
 begin
-
-	NewIsStatus <= '1' when frame_type'POS(NewType) < REALTIME_OFFSET else '0';
 
 	process (iClock)
 	begin
 		if (rising_edge(iClock)) then
 			if (iDataReady = '1') then
-				case NewType is
+				case NewDecoded.FrameType is
 					when DATA_FRAME =>
 						if (IgnoreData = '1') then
 							oIgnoredByte <= iMidiByte;
 							oIgnoredReady <= '1';
 						elsif (Datums = 0) then
-							oStatusParam1 <= NewAsData;
+							oStatus.Param1 <= NewDecoded.AsParam;
 							Datums <= Datums + 1;
+							oStatus.Message <= WorkingType;
 						else
-							oStatusParam2 <= NewAsData;
+							oStatus.Param2 <= NewDecoded.AsParam;
 							Datums <= 0;
+							if (WorkingType = STATUS_NOTE_ON and NewDecoded.AsParam = 0) then
+								oStatus.Message <= STATUS_NOTE_OFF;
+							end if;
 							oStatusReady <= '1';
 						end if;
 
 					when STATUS_NOTE_ON =>
-						IgnoreData <= '0';
-						Datums <= 0;
-						oStatusMessage <= NewType;
-						oStatusChannel <= NewAsChannel;
+						NewStatus(NewDecoded.FrameType, NewDecoded.AsChannel, WorkingType, IgnoreData, Datums, oStatus);
 
 					when STATUS_NOTE_OFF =>
-						IgnoreData <= '0';
-						Datums <= 0;
-						oStatusMessage <= NewType;
-						oStatusChannel <= NewAsChannel;
+						NewStatus(NewDecoded.FrameType, NewDecoded.AsChannel, WorkingType, IgnoreData, Datums, oStatus);
 
 					when others =>
 						oIgnoredByte <= iMidiByte;
 						oIgnoredReady <= '1';
-						IgnoreData <= NewIsStatus;
+						if (NewDecoded.IsRealtimeEvent = '0') then
+							IgnoreData <= '1';
+						end if;
 						
 				end case;
 			else
@@ -89,9 +98,7 @@ begin
 	midi_byte_classifier : entity work.byte_classifier
 	port map (
 		iMidiByte => iMidiByte,
-		oFrameType => NewType,
-		oAsChannel => NewAsChannel,
-		oAsData => NewAsData
+		oDecodedByte => NewDecoded
 	);
 
 end etc;

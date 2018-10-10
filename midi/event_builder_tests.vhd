@@ -15,10 +15,7 @@ architecture tests of event_builder_tests is
 	signal Clock : std_logic := '0';
 
 	signal StatusReady : std_logic := '0';
-	signal StatusMessage : frame_type;
-	signal StatusChannel : unsigned(3 downto 0);
-	signal StatusParam1 : unsigned(6 downto 0);
-	signal StatusParam2 : unsigned(6 downto 0);
+	signal Status : status_message;
 
 	signal IgnoredByte : std_logic_vector(7 downto 0);
 	signal IgnoredReady : std_logic := '0';
@@ -56,10 +53,7 @@ begin
 		iClock => Clock,
 
 		oStatusReady => StatusReady,
-		oStatusMessage => StatusMessage,
-		oStatusChannel => StatusChannel,
-		oStatusParam1 => StatusParam1,
-		oStatusParam2 => StatusParam2,
+		oStatus => Status,
 
 		oIgnoredByte => IgnoredByte,
 		oIgnoredReady => IgnoredReady
@@ -91,10 +85,7 @@ begin
 		AssertHigh(StatusReady);
 		AssertLow(IgnoredReady);
 		-- new status event!
-		AssertStatus(StatusMessage, STATUS_NOTE_ON,
-					 StatusChannel, 0,
-					 StatusParam1, MiddleC,
-					 StatusParam2, LowishVelocity);
+		AssertStatus(Status, STATUS_NOTE_ON, 0, MiddleC, LowishVelocity);
 
 		--
 		-- running status for a second note
@@ -108,10 +99,7 @@ begin
 		AssertHigh(StatusReady);
 		AssertLow(IgnoredReady);
 		-- new status event!
-		AssertStatus(StatusMessage, STATUS_NOTE_ON,
-					 StatusChannel, 0,
-					 StatusParam1, AnotherNote,
-					 StatusParam2, HighishVelocity);
+		AssertStatus(Status, STATUS_NOTE_ON, 0, AnotherNote, HighishVelocity);
 
 		--
 		-- unhandled system common message data should be ignored
@@ -150,10 +138,7 @@ begin
 		AssertHigh(StatusReady);
 		AssertLow(IgnoredReady);
 		-- new status event!
-		AssertStatus(StatusMessage, STATUS_NOTE_OFF,
-					 StatusChannel, 0,
-					 StatusParam1, MiddleC,
-					 StatusParam2, ZeroVelocity);
+		AssertStatus(Status, STATUS_NOTE_OFF, 0, MiddleC, ZeroVelocity);
 		
 		wait;
 	end process;

@@ -15,13 +15,10 @@ package midi_test_helper is
 
 	procedure AssertStatus
 	(
-		signal StatusMessage : frame_type;
+		signal Status : status_message;
 		constant ExpectedMessage : frame_type;
-		signal StatusChannel : unsigned(3 downto 0);
 		constant ExpectedChannel : integer;
-		signal StatusParam1 : unsigned(6 downto 0);
 		constant ExpectedParam1 : std_logic_vector(7 downto 0);
-		signal StatusParam2 : unsigned(6 downto 0);
 		constant ExpectedParam2 : std_logic_vector(7 downto 0)
 	);
 
@@ -72,23 +69,20 @@ package body midi_test_helper is
 
 	procedure AssertStatus
 	(
-		signal StatusMessage : frame_type;
+		signal Status : status_message;
 		constant ExpectedMessage : frame_type;
-		signal StatusChannel : unsigned(3 downto 0);
 		constant ExpectedChannel : integer;
-		signal StatusParam1 : unsigned(6 downto 0);
 		constant ExpectedParam1 : std_logic_vector(7 downto 0);
-		signal StatusParam2 : unsigned(6 downto 0);
 		constant ExpectedParam2 : std_logic_vector(7 downto 0)
 	) is
 	begin
-		assert StatusMessage = ExpectedMessage
+		assert Status.Message = ExpectedMessage
 			report "Unexpected value for StatusMessage" severity failure;
-		assert StatusChannel = ExpectedChannel
+		assert Status.Channel = ExpectedChannel
 			report "Unexpected value for StatusChannel" severity failure;
-		assert StatusParam1 = unsigned(ExpectedParam1(6 downto 0))
+		assert Status.Param1 = unsigned(ExpectedParam1(6 downto 0))
 			report "Unexpected value for StatusParam1" severity failure;
-		assert StatusParam2 = unsigned(ExpectedParam2(6 downto 0))
+		assert Status.Param2 = unsigned(ExpectedParam2(6 downto 0))
 			report "Unexpected value for StatusParam2" severity failure;
 	end AssertStatus;
 
