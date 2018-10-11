@@ -50,6 +50,18 @@ package midi is
 		Param2 : midi_param;
 	end record;
 
+	type voice is record
+		active : std_logic; -- note is currently pressed
+		expired : std_logic; -- note no longer contributes any sound
+		since_press : natural; -- time since note was pressed
+		since_release : natural; -- time since note was released
+		program : natural; -- program number
+		key : natural; -- key number
+		strike : natural; -- velocity
+	end record;
+
+	type voice_array is array (POLYPHONY - 1 downto 0) of voice;
+
 	function to_midi_param ( IntForm : in integer ) return midi_param;
 	
 end midi;
