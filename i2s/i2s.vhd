@@ -15,7 +15,8 @@ entity i2s is
 		oBitClock : out std_logic;
 		oWordClock : out std_logic;
 		oDataLine : out std_logic;
-		iMessage : in std_logic_vector(31 downto 0)
+		iLeftChannel : in signed(31 downto 0);
+		iRightChannel : in signed(31 downto 0)
 	);
 end entity;
 	
@@ -26,11 +27,12 @@ architecture etc of i2s is
 	signal Index : integer := 0;
 	signal Phase : std_logic := '0';
 	signal Channel : std_logic := '0';
+	signal Message : signed(31 downto 0) := to_signed(0, iLeftChannel'length);
 
 begin
 	oBitClock <= Phase;
 	oWordClock <= Channel;
-	oDataLine <= iMessage(Index);
+	oDataLine <= Message(Index);
 
 	process(iClock)
 	begin
@@ -50,6 +52,11 @@ begin
 			if (Index = 31) then
 				Index <= 0;
 				Channel <= not Channel;
+				if (Channel = '1') then
+				    Message <= iLeftChannel;
+				else
+				    Message <= iRightChannel;
+				end if;
 			else
 				Index <= Index + 1;
 			end if;

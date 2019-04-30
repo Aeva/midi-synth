@@ -60,7 +60,8 @@ architecture etc of press_button_get_light is
 	signal NoteStatus : std_logic_vector(3 downto 0) := "0000";
 	
 	-- I2S DAC test signal
-    signal Message : std_logic_vector(31 downto 0) := "10111111111111111111111111111111";
+    signal Message : signed(31 downto 0) := to_signed(0, 32);
+    signal Sample : integer := 2147483647;
     signal ToneCounter : integer := 0;
     constant SAMPLING_HZ : integer := 44100;
 
@@ -72,11 +73,14 @@ begin
 	
 	oI2sShutdown <= '1'; -- always on
 	
+	Message <= to_signed(Sample, Message'length);
+	
 	tone_generator: process (iClock)
 	begin
 	   if (rising_edge(iClock)) then
 	       if (ToneCounter = 227272) then -- 440 hz
-			   Message(31) <= not Message(31);
+			   --Message(31) <= not Message(31);
+			   Sample <= Sample * (-1);
 	           ToneCounter <= 0;
 	       else
 	           ToneCounter <= ToneCounter + 1;
@@ -163,7 +167,8 @@ begin
 	   oBitClock => oI2sBitClock,
 	   oWordClock => oI2sWorldClock,
        oDataLine => oI2sData,
-       iMessage => Message
+       iLeftChannel => Message,
+       iRightChannel => Message
 	);
 
 end etc;
