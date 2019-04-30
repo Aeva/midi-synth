@@ -61,9 +61,9 @@ architecture etc of press_button_get_light is
 	
 	-- I2S DAC test signal
     signal Message : signed(31 downto 0) := to_signed(0, 32);
-    signal Sample : integer := 2147483647;
-    signal ToneCounter : integer := 0;
     constant SAMPLING_HZ : integer := 44100;
+    constant FOUR_FORTY_HZ : integer := gClockHz / 440;
+    constant TEST_AMPLITUDE : integer := 2147483647; 
 
 begin
 
@@ -72,21 +72,6 @@ begin
 	oStatusLights <= not NoteStatus; -- set to ground to turn on the light
 	
 	oI2sShutdown <= '1'; -- always on
-	
-	Message <= to_signed(Sample, Message'length);
-	
-	tone_generator: process (iClock)
-	begin
-	   if (rising_edge(iClock)) then
-	       if (ToneCounter = 227272) then -- 440 hz
-			   --Message(31) <= not Message(31);
-			   Sample <= Sample * (-1);
-	           ToneCounter <= 0;
-	       else
-	           ToneCounter <= ToneCounter + 1;
-	       end if;
-	   end if;
-	end process;
 
 	midi_listener: process (iClock)
 	begin
@@ -155,6 +140,17 @@ begin
 		DATA_IN => DebugData,
 		DATA_SEND => DebugSend,
 		BUSY => DebugBusy
+	);
+	
+	tone_generator: entity work.sqrwave
+	generic map (
+	   gClockHz => gClockHz
+	)
+	port map (
+	   iClock => iClock,
+	   iFrequency => FOUR_FORTY_HZ,
+	   iAmplitude => TEST_AMPLITUDE,
+	   oSample => Message
 	);
 	
 	i2s_interface: entity work.i2s
