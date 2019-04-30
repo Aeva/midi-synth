@@ -20,7 +20,13 @@ entity press_button_get_light is
 		iMidiRxD : in std_logic;
 
 		-- indicator light
-		oStatusLights : out std_logic_vector(3 downto 0)
+		oStatusLights : out std_logic_vector(3 downto 0);
+		
+		-- I2S DAC test
+		oI2sData : out std_logic;
+        oI2sBitClock : out std_logic;
+        oI2sWorldClock : out std_logic;
+		oI2sShutdown : out std_logic
 	);
 end press_button_get_light;
 
@@ -52,17 +58,38 @@ architecture etc of press_button_get_light is
 	signal IgnoredReady : std_logic := '0';
 
 	signal NoteStatus : std_logic_vector(3 downto 0) := "0000";
+	
+	-- I2S DAC test signal
+    signal Message : std_logic_vector(31 downto 0) := "10111111111111111111111111111111";
+    signal ToneCounter : integer := 0;
+    constant SAMPLING_HZ : integer := 44100;
 
 begin
 
 	Reset <= not iReset;
 
 	oStatusLights <= not NoteStatus; -- set to ground to turn on the light
+	
+	oI2sShutdown <= '1'; -- always on
+	
+	tone_generator: process (iClock)
+	begin
+	   if (rising_edge(iClock)) then
+	       if (ToneCounter = 227272) then -- 440 hz
+			   Message(31) <= not Message(31);
+	           ToneCounter <= 0;
+	       else
+	           ToneCounter <= ToneCounter + 1;
+	       end if;
+	   end if;
+	end process;
 
-	process (iClock)
+	midi_listener: process (iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (StatusReady = '1') then
+			if (Reset = '1') then
+				NoteStatus <= "0000";
+			elsif (StatusReady = '1') then
 				case Status.Message is
 					when STATUS_NOTE_ON =>
 						case to_integer(Status.Param1) is
@@ -124,6 +151,19 @@ begin
 		DATA_IN => DebugData,
 		DATA_SEND => DebugSend,
 		BUSY => DebugBusy
+	);
+	
+	i2s_interface: entity work.i2s
+	generic map (
+	   gClockHz => gClockHz,
+	   gSamplingHz => SAMPLING_HZ
+	)
+	port map (
+	   iClock => iClock,
+	   oBitClock => oI2sBitClock,
+	   oWordClock => oI2sWorldClock,
+       oDataLine => oI2sData,
+       iMessage => Message
 	);
 
 end etc;
