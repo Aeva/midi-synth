@@ -11,8 +11,8 @@ package midi is
 	type frame_type is
 	(
 		DATA_FRAME,
-		STATUS_NOTE_ON,
 		STATUS_NOTE_OFF,
+		STATUS_NOTE_ON,
 		STATUS_POLYPHONIC_PRESSURE,
 		STATUS_CONTROL_CHANGE,
 		STATUS_PROGRAM_CHANGE,
@@ -32,7 +32,7 @@ package midi is
 	subtype midi_channel is unsigned(3 downto 0);
 	subtype midi_param is unsigned(6 downto 0);
 
-	constant STATUS_OFFSET : integer := frame_type'POS(STATUS_NOTE_ON);
+	constant STATUS_OFFSET : integer := frame_type'POS(STATUS_NOTE_OFF);
 	constant REALTIME_OFFSET : integer := frame_type'POS(REALTIME_TIMING_CLOCK);
 
 	type decoded_byte is record
