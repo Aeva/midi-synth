@@ -63,7 +63,7 @@ architecture etc of press_button_get_light is
     signal Message : signed(31 downto 0) := to_signed(0, 32);
     constant SAMPLING_HZ : integer := 44100;
     constant FOUR_FORTY_HZ : integer := gClockHz / 440;
-    constant TEST_AMPLITUDE : integer := 2147483647; 
+    constant TEST_AMPLITUDE : integer := 1073741823; 
 
 begin
 
@@ -71,7 +71,7 @@ begin
 
 	oStatusLights <= not NoteStatus; -- set to ground to turn on the light
 	
-	oI2sShutdown <= '1'; -- always on
+	oI2sShutdown <= iReset;
 
 	midi_listener: process (iClock)
 	begin
@@ -160,6 +160,7 @@ begin
 	)
 	port map (
 	   iClock => iClock,
+	   iReset => iReset,
 	   oBitClock => oI2sBitClock,
 	   oWordClock => oI2sWorldClock,
        oDataLine => oI2sData,

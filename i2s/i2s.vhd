@@ -11,6 +11,7 @@ entity i2s is
 	);
 	port (
 		iClock : in std_logic; -- system clock
+		iReset : in std_logic; -- assumed to be held high
 		-- I2S interface
 		oBitClock : out std_logic;
 		oWordClock : out std_logic;
@@ -27,38 +28,37 @@ architecture etc of i2s is
 	signal Index : integer := 0;
 	signal Phase : std_logic := '0';
 	signal Channel : std_logic := '0';
-	signal Message : signed(31 downto 0) := to_signed(0, iLeftChannel'length);
+	signal Message : signed(31 downto 0) := "00000000000000000000000000000000";
 
 begin
-	oBitClock <= Phase;
-	oWordClock <= Channel;
-	oDataLine <= Message(Index);
+
+    oBitClock <= Phase;
+    oWordClock <= Channel;
+    oDataLine <= Message(Index);
 
 	process(iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (ClockCounter = CLOCK_TARGET) then
+		    if (ClockCounter = CLOCK_TARGET) then
 				ClockCounter <= 0;
 				Phase <= not Phase;
+				if (Phase = '1') then
+					if (iReset = '0' or Index = 31) then
+                		Index <= 0;
+                    	if (Channel = '0') then
+                    		Message <= iLeftChannel;
+                    	else
+                    		Message <= iRightChannel;
+                    	end if;
+                	else
+                		Index <= Index + 1;
+                		if (Index = 30) then
+                    		Channel <= not Channel;
+                    	end if;
+                    end if;
+                end if;
 			else
 				ClockCounter <= ClockCounter + 1;
-			end if;
-		end if;
-	end process;
-
-	process(Phase)
-	begin
-		if (falling_edge(Phase)) then
-			if (Index = 31) then
-				Index <= 0;
-				Channel <= not Channel;
-				if (Channel = '1') then
-				    Message <= iLeftChannel;
-				else
-				    Message <= iRightChannel;
-				end if;
-			else
-				Index <= Index + 1;
 			end if;
 		end if;
 	end process;
