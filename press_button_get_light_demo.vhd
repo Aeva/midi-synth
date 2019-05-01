@@ -63,7 +63,13 @@ architecture etc of press_button_get_light is
     signal Message : signed(31 downto 0) := to_signed(0, 32);
     constant SAMPLING_HZ : integer := 44100;
     constant FOUR_FORTY_HZ : integer := gClockHz / 440;
-    constant TEST_AMPLITUDE : integer := 1073741823; 
+    constant TEST_AMPLITUDE : integer := 1073741823; -- very loud
+    
+    signal LastNote : integer := 0;
+    signal NoteHz : integer := FOUR_FORTY_HZ;
+    signal NoteVolume : integer := 0;
+
+    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";    
 
 begin
 
@@ -81,18 +87,30 @@ begin
 			elsif (StatusReady = '1') then
 				case Status.Message is
 					when STATUS_NOTE_ON =>
+					    NoteVolume <= TEST_AMPLITUDE;
+					    --NoteHz <= gClockHz / to_integer(shift_left(SHIFT_BASE, (to_integer(Status.Param1) - 33) / 12));
+					    LastNote <= to_integer(Status.Param1);
 						case to_integer(Status.Param1) is
 							when 60 =>
+							    NoteHz <= gClockHz / 261;
 								NoteStatus(0) <= '1';
 							when 62 =>
+							    NoteHz <= gClockHz / 293;
 								NoteStatus(1) <= '1';
 							when 64 =>
+							    NoteHz <= gClockHz / 329;
 								NoteStatus(2) <= '1';
 							when 65 =>
+							    NoteHz <= gClockHz / 349;
 								NoteStatus(3) <= '1';
 							when others =>
+							    NoteHz <= gClockHz / 440;
 						end case;
 					when STATUS_NOTE_OFF =>
+					    if (to_integer(Status.Param1) = LastNote) then
+					    	NoteVolume <= 0;
+					    	NoteHz <= 0;
+					    end if;
 						case to_integer(Status.Param1) is
 							when 60 =>
 								NoteStatus(0) <= '0';
@@ -148,8 +166,8 @@ begin
 	)
 	port map (
 	   iClock => iClock,
-	   iFrequency => FOUR_FORTY_HZ,
-	   iAmplitude => TEST_AMPLITUDE,
+	   iFrequency => NoteHz,
+	   iAmplitude => NoteVolume,
 	   oSample => Message
 	);
 	
