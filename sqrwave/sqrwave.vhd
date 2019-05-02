@@ -5,9 +5,6 @@ use work.midi.all;
 
 
 entity sqrwave is
-	generic (
-        gClockHz : integer := 1e8 -- system clock frequency in Hz
-    );
     port (
     	iClock : in std_logic; -- system clock
     	iFrequency : in integer;

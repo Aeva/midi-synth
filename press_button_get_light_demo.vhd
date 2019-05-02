@@ -1,5 +1,4 @@
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -63,13 +62,18 @@ architecture etc of press_button_get_light is
     signal Message : signed(31 downto 0) := to_signed(0, 32);
     constant SAMPLING_HZ : integer := 44100;
     constant FOUR_FORTY_HZ : integer := gClockHz / 440;
-    constant TEST_AMPLITUDE : integer := 1073741823; -- very loud
+    --constant TEST_AMPLITUDE : integer := 1073741823; -- very loud (2**30-1)
+    --constant TEST_AMPLITUDE : integer := 536870912; -- (2**29) doesn't play anything at all?
+    constant TEST_AMPLITUDE : integer := 536870911; -- (2**29-1) still loud, but plays stuff
     
     signal LastNote : integer := 0;
     signal NoteHz : integer := FOUR_FORTY_HZ;
     signal NoteVolume : integer := 0;
 
-    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";    
+    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";
+    
+    type volumes_array is array (0 to 9) of signed(31 downto 0);
+    signal OctaveSamples : volumes_array;
 
 begin
 
@@ -82,49 +86,73 @@ begin
 	midi_listener: process (iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (Reset = '1') then
-				NoteStatus <= "0000";
-			elsif (StatusReady = '1') then
-				case Status.Message is
-					when STATUS_NOTE_ON =>
-					    NoteVolume <= TEST_AMPLITUDE;
-					    --NoteHz <= gClockHz / to_integer(shift_left(SHIFT_BASE, (to_integer(Status.Param1) - 33) / 12));
-					    LastNote <= to_integer(Status.Param1);
-						case to_integer(Status.Param1) is
-							when 60 =>
-							    NoteHz <= gClockHz / 261;
-								NoteStatus(0) <= '1';
-							when 62 =>
-							    NoteHz <= gClockHz / 293;
-								NoteStatus(1) <= '1';
-							when 64 =>
-							    NoteHz <= gClockHz / 329;
-								NoteStatus(2) <= '1';
-							when 65 =>
-							    NoteHz <= gClockHz / 349;
-								NoteStatus(3) <= '1';
-							when others =>
-							    NoteHz <= gClockHz / 440;
-						end case;
-					when STATUS_NOTE_OFF =>
-					    if (to_integer(Status.Param1) = LastNote) then
-					    	NoteVolume <= 0;
-					    	NoteHz <= 0;
-					    end if;
-						case to_integer(Status.Param1) is
-							when 60 =>
-								NoteStatus(0) <= '0';
-							when 62 =>
-								NoteStatus(1) <= '0';
-							when 64 =>
-								NoteStatus(2) <= '0';
-							when 65 =>
-								NoteStatus(3) <= '0';
-							when others =>
-						end case;
-					when others =>
-				end case;
-			end if;
+		    if (to_integer(OctaveSamples(0)) > 0) then
+		        Message <= OctaveSamples(0);
+		    elsif (to_integer(OctaveSamples(1)) > 0) then
+		        Message <= OctaveSamples(1);
+		    elsif (to_integer(OctaveSamples(2)) > 0) then
+		        Message <= OctaveSamples(2);
+		    elsif (to_integer(OctaveSamples(3)) > 0) then
+		        Message <= OctaveSamples(3);
+		    elsif (to_integer(OctaveSamples(4)) > 0) then
+		        Message <= OctaveSamples(4);
+		    elsif (to_integer(OctaveSamples(5)) > 0) then
+		        Message <= OctaveSamples(5);
+		    elsif (to_integer(OctaveSamples(6)) > 0) then
+		        Message <= OctaveSamples(6);
+		    elsif (to_integer(OctaveSamples(7)) > 0) then
+		        Message <= OctaveSamples(7);
+		    elsif (to_integer(OctaveSamples(8)) > 0) then
+		        Message <= OctaveSamples(8);
+		    elsif (to_integer(OctaveSamples(9)) > 0) then
+		        Message <= OctaveSamples(9);
+		    else
+		        Message <= to_signed(0, Message'length);
+		    end if;
+
+--			if (Reset = '1') then
+--				NoteStatus <= "0000";
+--			elsif (StatusReady = '1') then
+--				case Status.Message is
+--					when STATUS_NOTE_ON =>
+--					    NoteVolume <= TEST_AMPLITUDE;
+--					    --NoteHz <= gClockHz / to_integer(shift_left(SHIFT_BASE, (to_integer(Status.Param1) - 33) / 12));
+--					    LastNote <= to_integer(Status.Param1);
+--						case to_integer(Status.Param1) is
+--							when 60 =>
+--							    NoteHz <= gClockHz / 261;
+--								NoteStatus(0) <= '1';
+--							when 62 =>
+--							    NoteHz <= gClockHz / 293;
+--								NoteStatus(1) <= '1';
+--							when 64 =>
+--							    NoteHz <= gClockHz / 329;
+--								NoteStatus(2) <= '1';
+--							when 65 =>
+--							    NoteHz <= gClockHz / 349;
+--								NoteStatus(3) <= '1';
+--							when others =>
+--							    NoteHz <= gClockHz / 440;
+--						end case;
+--					when STATUS_NOTE_OFF =>
+--					    if (to_integer(Status.Param1) = LastNote) then
+--					    	NoteVolume <= 0;
+--					    	NoteHz <= 0;
+--					    end if;
+--						case to_integer(Status.Param1) is
+--							when 60 =>
+--								NoteStatus(0) <= '0';
+--							when 62 =>
+--								NoteStatus(1) <= '0';
+--							when 64 =>
+--								NoteStatus(2) <= '0';
+--							when 65 =>
+--								NoteStatus(3) <= '0';
+--							when others =>
+--						end case;
+--					when others =>
+--				end case;
+--			end if;
 		end if;
 	end process;
 	
@@ -160,16 +188,13 @@ begin
 		BUSY => DebugBusy
 	);
 	
-	tone_generator: entity work.sqrwave
-	generic map (
-	   gClockHz => gClockHz
-	)
-	port map (
-	   iClock => iClock,
-	   iFrequency => NoteHz,
-	   iAmplitude => NoteVolume,
-	   oSample => Message
-	);
+--	tone_generator: entity work.sqrwave
+--	port map (
+--	   iClock => iClock,
+--	   iFrequency => NoteHz,
+--	   iAmplitude => NoteVolume,
+--	   oSample => Message
+--	);
 	
 	i2s_interface: entity work.i2s
 	generic map (
@@ -185,5 +210,22 @@ begin
        iLeftChannel => Message,
        iRightChannel => Message
 	);
+	
+	octave_generator: for P in 0 to 9 generate
+	begin
+	   generated_octave: entity work.Octave
+	   generic map (
+	       gClockHz => gClockHz,
+	       gMidiOctave => P,
+	       gMaxVolume => TEST_AMPLITUDE
+	   )
+	   port map (
+	       iClock => iClock,
+           iReset => iReset,
+           iStatusReady => StatusReady,
+           iStatus => Status,
+           oMessage => OctaveSamples(P)
+	   );
+	end generate;
 
 end etc;
