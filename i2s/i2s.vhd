@@ -24,11 +24,12 @@ end entity;
 
 architecture etc of i2s is
 	constant CLOCK_TARGET : integer := gClockHz / (gSamplingHz * 32 * 2 * 2);
+	constant ZERO_MESSAGE : std_logic_vector(0 to 31) := "00000000000000000000000000000000";
 	signal ClockCounter : integer := 0;
 	signal Index : integer := 0;
 	signal Phase : std_logic := '0';
 	signal Channel : std_logic := '0';
-	signal Message : signed(31 downto 0) := "00000000000000000000000000000000";
+	signal Message : std_logic_vector(0 to 31) := ZERO_MESSAGE;
 
 begin
 
@@ -46,9 +47,10 @@ begin
 					if (iReset = '0' or Index = 31) then
                 		Index <= 0;
                     	if (Channel = '0') then
-                    		Message <= iLeftChannel;
+                    		Message <= std_logic_vector(iLeftChannel);
                     	else
-                    		Message <= iRightChannel;
+                    		Message <= std_logic_vector(iRightChannel);
+                    		--Message <= std_logic_vector(ZERO_MESSAGE);
                     	end if;
                 	else
                 		Index <= Index + 1;
