@@ -22,6 +22,9 @@ entity press_button_get_light is
 		-- indicator light
 		oStatusLights : out std_logic_vector(3 downto 0);
 		
+		-- switch bank
+		iSwitches : in std_logic_vector(3 downto 0);
+
 		-- I2S DAC test
 		oI2sData : out std_logic;
         oI2sBitClock : out std_logic;
@@ -63,21 +66,26 @@ architecture etc of press_button_get_light is
     signal Message : signed(31 downto 0) := to_signed(0, 32);
     constant SAMPLING_HZ : integer := 44100;
     constant FOUR_FORTY_HZ : integer := gClockHz / 440;
-    constant TEST_AMPLITUDE : integer := 1073741823; -- very loud
+    --constant TEST_AMPLITUDE : integer := 1073741823; -- (2**30-1), *very* loud
+    constant TEST_AMPLITUDE : integer := 16777215; -- (2**24-1)
+    signal VolumeMultiplier : integer := 0;
     
     signal LastNote : integer := 0;
     signal NoteHz : integer := FOUR_FORTY_HZ;
     signal NoteVolume : integer := 0;
 
-    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";    
+    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";
 
 begin
 
 	Reset <= not iReset;
 
-	oStatusLights <= not NoteStatus; -- set to ground to turn on the light
+	--oStatusLights <= not NoteStatus; -- set to ground to turn on the light
+	oStatusLights <= iSwitches;
 	
 	oI2sShutdown <= iReset;
+
+	VolumeMultiplier <= to_integer(unsigned(iSwitches));
 
 	midi_listener: process (iClock)
 	begin
@@ -87,8 +95,7 @@ begin
 			elsif (StatusReady = '1') then
 				case Status.Message is
 					when STATUS_NOTE_ON =>
-					    NoteVolume <= TEST_AMPLITUDE;
-					    --NoteHz <= gClockHz / to_integer(shift_left(SHIFT_BASE, (to_integer(Status.Param1) - 33) / 12));
+					    NoteVolume <= TEST_AMPLITUDE * (VolumeMultiplier + 1);
 					    LastNote <= to_integer(Status.Param1);
 						case to_integer(Status.Param1) is
 							when 60 =>
