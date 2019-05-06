@@ -65,16 +65,13 @@ architecture etc of press_button_get_light is
 	-- I2S DAC test signal
     signal Message : signed(31 downto 0) := to_signed(0, 32);
     constant SAMPLING_HZ : integer := 44100;
-    constant FOUR_FORTY_HZ : integer := gClockHz / 440;
-    --constant TEST_AMPLITUDE : integer := 1073741823; -- (2**30-1), *very* loud
-    constant TEST_AMPLITUDE : integer := 16777215; -- (2**24-1)
-    signal VolumeMultiplier : integer := 0;
-    
-    signal LastNote : integer := 0;
-    signal NoteHz : integer := FOUR_FORTY_HZ;
-    signal NoteVolume : integer := 0;
 
-    constant SHIFT_BASE : unsigned(7 downto 0) := "00000001";
+	-- basic midi instrument
+    constant BASE_MULTIPLIER : integer := 262144; -- (2**18)
+    signal VolumeMultiplier : integer := 0;
+    signal LastNote : integer := 0;
+    signal NoteHz : integer := 0;
+    signal NoteVolume : integer := 0;
 
 begin
 
@@ -95,7 +92,7 @@ begin
 			elsif (StatusReady = '1') then
 				case Status.Message is
 					when STATUS_NOTE_ON =>
-					    NoteVolume <= TEST_AMPLITUDE * (VolumeMultiplier + 1);
+					    NoteVolume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
 					    LastNote <= to_integer(Status.Param1);
 						case to_integer(Status.Param1) is
 							when 60 =>
