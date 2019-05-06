@@ -1,5 +1,4 @@
 
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -59,8 +58,6 @@ architecture etc of press_button_get_light is
 	signal Status : status_message;
 	signal IgnoredByte : std_logic_vector(7 downto 0);
 	signal IgnoredReady : std_logic := '0';
-
-	signal NoteStatus : std_logic_vector(3 downto 0) := "0000";
 	
 	-- I2S DAC test signal
     signal Message : signed(31 downto 0) := to_signed(0, 32);
@@ -69,15 +66,13 @@ architecture etc of press_button_get_light is
 	-- basic midi instrument
     constant BASE_MULTIPLIER : integer := 262144; -- (2**18)
     signal VolumeMultiplier : integer := 0;
-    signal LastNote : integer := 0;
-    signal NoteHz : integer := 0;
+    signal LastNote : midi_param := to_midi_param(0);
+    signal NoteHz : integer range 8 to 15804 := 0;
     signal NoteVolume : integer := 0;
 
 begin
 
 	Reset <= not iReset;
-
-	--oStatusLights <= not NoteStatus; -- set to ground to turn on the light
 	oStatusLights <= iSwitches;
 	
 	oI2sShutdown <= iReset;
@@ -87,47 +82,12 @@ begin
 	midi_listener: process (iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (Reset = '1') then
-				NoteStatus <= "0000";
-			elsif (StatusReady = '1') then
-				case Status.Message is
-					when STATUS_NOTE_ON =>
-					    NoteVolume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
-					    LastNote <= to_integer(Status.Param1);
-						case to_integer(Status.Param1) is
-							when 60 =>
-							    NoteHz <= gClockHz / 261;
-								NoteStatus(0) <= '1';
-							when 62 =>
-							    NoteHz <= gClockHz / 293;
-								NoteStatus(1) <= '1';
-							when 64 =>
-							    NoteHz <= gClockHz / 329;
-								NoteStatus(2) <= '1';
-							when 65 =>
-							    NoteHz <= gClockHz / 349;
-								NoteStatus(3) <= '1';
-							when others =>
-							    NoteHz <= gClockHz / 440;
-						end case;
-					when STATUS_NOTE_OFF =>
-					    if (to_integer(Status.Param1) = LastNote) then
-					    	NoteVolume <= 0;
-					    	NoteHz <= 0;
-					    end if;
-						case to_integer(Status.Param1) is
-							when 60 =>
-								NoteStatus(0) <= '0';
-							when 62 =>
-								NoteStatus(1) <= '0';
-							when 64 =>
-								NoteStatus(2) <= '0';
-							when 65 =>
-								NoteStatus(3) <= '0';
-							when others =>
-						end case;
-					when others =>
-				end case;
+			if (Reset = '1' or (Status.Message = STATUS_NOTE_OFF and Status.Param1 = LastNote)) then
+				NoteVolume <= 0;
+				LastNote <= to_midi_param(0);
+			elsif (Status.Message = STATUS_NOTE_ON) then
+				NoteVolume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
+				LastNote <= Status.Param1;
 			end if;
 		end if;
 	end process;
@@ -162,6 +122,13 @@ begin
 		DATA_IN => DebugData,
 		DATA_SEND => DebugSend,
 		BUSY => DebugBusy
+	);
+
+	frequency_finder: entity work.note_to_frequency
+	port map (
+		iClock => iClock,
+		iNoteNumber => LastNote,
+		oFrequency => NoteHz
 	);
 	
 	tone_generator: entity work.sqrwave

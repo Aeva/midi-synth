@@ -10,7 +10,7 @@ entity sqrwave is
     );
     port (
     	iClock : in std_logic; -- system clock
-    	iFrequency : in integer;
+    	iFrequency : in integer range 8 to 15804;
     	iAmplitude : in integer;
     	oSample : out signed(31 downto 0)
     );
@@ -19,20 +19,18 @@ end entity;
 
 architecture etc of sqrwave is
     signal Counter : integer := 0;
-    signal Sample : integer := 0;
-    signal Sign : integer := 1;
+    signal Sign : integer range -1 to 1:= 1;
 begin
-    oSample <= to_signed(Sample, oSample'length);
     
     process (iClock)
 	begin
 	   if (rising_edge(iClock)) then
-	       if (Counter >= iFrequency) then
-			   Sample <= iAmplitude * Sign;
+	       if (Counter >= gClockHz) then
+			   oSample <= to_signed(iAmplitude * Sign, oSample'length);
 			   Sign <= Sign * (-1); 
 	           Counter <= 0;
 	       else
-	           Counter <= Counter + 1;
+	           Counter <= Counter + iFrequency;
 	       end if;
 	   end if;
 	end process;
