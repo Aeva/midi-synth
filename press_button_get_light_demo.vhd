@@ -70,6 +70,25 @@ architecture etc of press_button_get_light is
     signal NoteHz : integer range 8 to 15804 := 0;
     signal NoteVolume : integer := 0;
 
+	-- voice pool
+	constant POLYPHONY : integer := 6;
+	constant POLYPHONY_END : integer := POLYPHONY - 1;
+
+	type voice_state is record
+		MidiNote : midi_param;
+		Frequency : integer range 8 to 15804;
+		Volume : integer;
+		Sample : signed(31 downto 0);
+	end record;
+
+	type voice_state_array is array (0 to POLYPHONY_END) of voice_state;
+	signal VoicePool : voice_state_array;
+	signal NextVoice : integer range 0 to POLYPHONY_END := 0;
+	signal LastVoice : integer range 0 to POLYPHONY_END := 0;
+
+	signal MessageSum : signed(31 downto 0) := to_signed(0, 32);
+	signal SumIndex : integer range 0 to POLYPHONY_END := 0;
+
 begin
 
 	Reset <= not iReset;
@@ -82,12 +101,58 @@ begin
 	midi_listener: process (iClock)
 	begin
 		if (rising_edge(iClock)) then
-			if (Reset = '1' or (Status.Message = STATUS_NOTE_OFF and Status.Param1 = LastNote)) then
-				NoteVolume <= 0;
-				LastNote <= to_midi_param(0);
-			elsif (Status.Message = STATUS_NOTE_ON) then
-				NoteVolume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
-				LastNote <= Status.Param1;
+			if (Reset = '1') then
+				for p in 0 to POLYPHONY_END loop
+					VoicePool(p).MidiNote <= to_midi_param(0);
+					VoicePool(p).Volume <= 0;
+				end loop;
+				NextVoice <= 0;
+				LastVoice <= 0;
+				MessageSum <= to_signed(0, 32);
+				SumIndex <= 0;
+			else
+				if (Status.Message = STATUS_NOTE_OFF) then
+					for p in 0 to POLYPHONY_END loop
+						if (VoicePool(p).MidiNote = Status.Param1) then
+							VoicePool(p).MidiNote <= to_midi_param(0);
+							VoicePool(p).Volume <= 0;
+						end if;
+					end loop;
+				elsif (Status.Message = STATUS_NOTE_ON) then
+					VoicePool(NextVoice).Volume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
+					VoicePool(NextVoice).MidiNote <= Status.Param1; 
+					LastNote <= Status.Param1;
+					LastVoice <= NextVoice;
+					if (NextVoice = POLYPHONY_END)
+					then
+						NextVoice <= 0;
+					else
+						NextVoice <= NextVoice + 1;
+					end if;
+				elsif (VoicePool(NextVoice).Volume > 0) then
+					if (NextVoice = POLYPHONY_END)
+					then
+						NextVoice <= 0;
+					else
+						NextVoice <= NextVoice + 1;
+					end if;
+				else
+					if (VoicePool(LastVoice).Volume > 0) then
+						VoicePool(LastVoice).Frequency <= NoteHz;
+					end if;
+				end if;
+
+				if (SumIndex = POLYPHONY_END)
+				then
+					Message <= MessageSum;
+					MessageSum <= to_signed(0, 32);
+					SumIndex <= 0;
+				else
+					if (VoicePool(SumIndex).Volume > 0) then
+						MessageSum <= MessageSum + VoicePool(SumIndex).Sample;
+					end if;
+					SumIndex <= SumIndex + 1;
+				end if;
 			end if;
 		end if;
 	end process;
@@ -131,16 +196,18 @@ begin
 		oFrequency => NoteHz
 	);
 	
-	tone_generator: entity work.sqrwave
-	generic map (
-	   gClockHz => gClockHz
-	)
-	port map (
-	   iClock => iClock,
-	   iFrequency => NoteHz,
-	   iAmplitude => NoteVolume,
-	   oSample => Message
-	);
+	voice_generators: for p in 0 to POLYPHONY_END generate
+		voice: entity work.sqrwave
+		generic map (
+			gClockHz => gClockHz
+		)
+		port map (
+			iClock => iClock,
+			iFrequency => VoicePool(p).Frequency,
+			iAmplitude => VoicePool(p).Volume,
+			oSample => VoicePool(p).Sample
+		);
+	end generate;
 	
 	i2s_interface: entity work.i2s
 	generic map (
