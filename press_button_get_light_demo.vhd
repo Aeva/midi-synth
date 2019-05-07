@@ -87,7 +87,7 @@ architecture etc of press_button_get_light is
 	signal LastVoice : integer range 0 to POLYPHONY_END := 0;
 
 	signal MessageSum : signed(31 downto 0) := to_signed(0, 32);
-	signal SumIndex : integer range 0 to POLYPHONY_END := 0;
+	signal SumIndex : integer range 0 to POLYPHONY := 0;
 
 begin
 
@@ -97,6 +97,27 @@ begin
 	oI2sShutdown <= iReset;
 
 	VolumeMultiplier <= to_integer(unsigned(iSwitches));
+
+	voice_combiner: process (iClock)
+	begin
+		if (rising_edge(iClock)) then
+			if (Reset = '1') then
+				SumIndex <= 0;
+				Message <= to_signed(0, 32);
+				MessageSum <= to_signed(0, 32);
+			elsif (SumIndex = POLYPHONY) then
+				-- loop one index past the end before resetting
+				Message <= MessageSum;
+				MessageSum <= to_signed(0, 32);
+				SumIndex <= 0;
+			else
+				if (VoicePool(SumIndex).Volume > 0) then
+					MessageSum <= MessageSum + VoicePool(SumIndex).Sample;
+				end if;
+				SumIndex <= SumIndex + 1;
+			end if;
+		end if;
+	end process;
 
 	midi_listener: process (iClock)
 	begin
@@ -108,9 +129,7 @@ begin
 				end loop;
 				NextVoice <= 0;
 				LastVoice <= 0;
-				MessageSum <= to_signed(0, 32);
-				SumIndex <= 0;
-			else
+			elsif (StatusReady = '1') then
 				if (Status.Message = STATUS_NOTE_OFF) then
 					for p in 0 to POLYPHONY_END loop
 						if (VoicePool(p).MidiNote = Status.Param1) then
@@ -120,7 +139,7 @@ begin
 					end loop;
 				elsif (Status.Message = STATUS_NOTE_ON) then
 					VoicePool(NextVoice).Volume <= to_integer(Status.Param2) * BASE_MULTIPLIER * (VolumeMultiplier + 1);
-					VoicePool(NextVoice).MidiNote <= Status.Param1; 
+					VoicePool(NextVoice).MidiNote <= Status.Param1;
 					LastNote <= Status.Param1;
 					LastVoice <= NextVoice;
 					if (NextVoice = POLYPHONY_END)
@@ -129,29 +148,17 @@ begin
 					else
 						NextVoice <= NextVoice + 1;
 					end if;
-				elsif (VoicePool(NextVoice).Volume > 0) then
-					if (NextVoice = POLYPHONY_END)
-					then
-						NextVoice <= 0;
-					else
-						NextVoice <= NextVoice + 1;
-					end if;
-				else
-					if (VoicePool(LastVoice).Volume > 0) then
-						VoicePool(LastVoice).Frequency <= NoteHz;
-					end if;
 				end if;
-
-				if (SumIndex = POLYPHONY_END)
+			elsif (VoicePool(NextVoice).Volume > 0) then
+				if (NextVoice = POLYPHONY_END)
 				then
-					Message <= MessageSum;
-					MessageSum <= to_signed(0, 32);
-					SumIndex <= 0;
+					NextVoice <= 0;
 				else
-					if (VoicePool(SumIndex).Volume > 0) then
-						MessageSum <= MessageSum + VoicePool(SumIndex).Sample;
-					end if;
-					SumIndex <= SumIndex + 1;
+					NextVoice <= NextVoice + 1;
+				end if;
+			else
+				if (VoicePool(LastVoice).Volume > 0) then
+					VoicePool(LastVoice).Frequency <= NoteHz;
 				end if;
 			end if;
 		end if;
